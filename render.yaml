@@ -6,9 +6,9 @@ services:
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://volidam_databse_user:K2IDqUSN2nSESXI9SfQyzQJsCldtTyxn@dpg-d6lhpv6a2pns73epf5c0-a/volidam_databse
       - key: JWT_SECRET
-        generateValue: true
+        value: volidam-patir-super-secret-jwt-key-2024
       - key: JWT_EXPIRES_IN
         value: 24h
       - key: NODE_ENV
