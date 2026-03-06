@@ -27,9 +27,14 @@ export default function LoginPage() {
 
       const data = await response.json();
 
+      console.log('Login response:', response.status, data);
+      console.log('Response ok:', response.ok);
+
       if (!response.ok) {
         throw new Error(data.error || 'Login failed');
       }
+
+      console.log('Redirecting to role:', data.user.role);
 
       // Redirect based on role
       const role = data.user.role;
@@ -47,7 +52,7 @@ export default function LoginPage() {
           window.location.href = '/dokonchi';
           break;
         default:
-          window.location.href = '/';
+          window.location.href = '/admin';
       }
     } catch (err: any) {
       setError(err.message);
