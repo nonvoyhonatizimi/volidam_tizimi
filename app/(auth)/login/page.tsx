@@ -35,19 +35,19 @@ export default function LoginPage() {
       const role = data.user.role;
       switch (role) {
         case 'ADMIN':
-          router.push('/admin');
+          window.location.href = '/admin';
           break;
         case 'HAMIRCHI':
-          router.push('/hamirchi');
+          window.location.href = '/hamirchi';
           break;
         case 'SOTUVCHI':
-          router.push('/sotuvchi');
+          window.location.href = '/sotuvchi';
           break;
         case 'DOKONCHI':
-          router.push('/dokonchi');
+          window.location.href = '/dokonchi';
           break;
         default:
-          router.push('/');
+          window.location.href = '/';
       }
     } catch (err: any) {
       setError(err.message);
