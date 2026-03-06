@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  HAMIRCHI
+  SOTUVCHI
+  DOKONCHI
+}
+
+enum ShiftType {
+  DAY
+  NIGHT
+}
+
+enum PaymentType {
+  CLICK
+  PLASTIC
+}
+
+enum ItemType {
+  QURT
+  NON
+}
+
+enum ExpenseType {
+  GENERAL
+  INCOMING_GOODS
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   // hashed
+  fullName  String
+  role      UserRole
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  doughEntries DoughEntry[]
+  sales        Sale[]
+  expenses     Expense[]
+  closedShifts Shift[]      @relation("ShiftClosedBy")
+}
+
+model DoughEntry {
+  id          String   @id @default(uuid())
+  breadType   String
+  flourAmount Float    // in kg
+  userId      String
+  shiftId     String
+  createdAt   DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@index([shiftId])
+  @@index([userId])
+}
+
+model Sale {
+  id          String      @id @default(uuid())
+  itemType    ItemType
+  productType String
+  quantity    Float       // kg for qurt, count for non
+  totalPrice  Float
+  paymentType PaymentType
+  userId      String
+  shiftId     String
+  createdAt   DateTime    @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@index([shiftId])
+  @@index([userId])
+}
+
+model Expense {
+  id          String      @id @default(uuid())
+  type        ExpenseType
+  amount      Float
+  description String
+  userId      String
+  shiftId     String
+  createdAt   DateTime    @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@index([shiftId])
+  @@index([userId])
+}
+
+model Shift {
+  id          String    @id @default(uuid())
+  type        ShiftType
+  date        DateTime  @db.Date
+  isActive    Boolean   @default(true)
+  closedAt    DateTime?
+  closedBy    String?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  doughEntries DoughEntry[]
+  sales        Sale[]
+  expenses     Expense[]
+  report       DailyReport?
+  closedByUser User?      @relation("ShiftClosedBy", fields: [closedBy], references: [id])
+
+  @@index([isActive])
+  @@index([date])
+}
+
+model DailyReport {
+  id               String   @id @default(uuid())
+  shiftId          String   @unique
+  totalFlourUsed   Float
+  totalQurtSold    Float
+  totalNonSold     Int
+  qurtClickTotal   Float
+  qurtPlasticTotal Float
+  nonClickTotal    Float
+  nonPlasticTotal  Float
+  totalExpenses    Float
+  netProfit        Float
+  generatedAt      DateTime @default(now())
+
+  shift Shift @relation(fields: [shiftId], references: [id])
+}
