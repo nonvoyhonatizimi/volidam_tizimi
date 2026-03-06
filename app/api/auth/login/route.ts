@@ -79,9 +79,10 @@ export async function POST(request: NextRequest) {
       name: 'token',
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24, // 24 hours
+      path: '/',
     });
 
     return response;
