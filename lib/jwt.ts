@@ -1,7 +1,18 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'volidam-patir-default-secret-key-2024';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+// Get environment variables with fallbacks
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.warn('JWT_SECRET not set, using default secret');
+    return 'volidam-patir-default-secret-key-2024';
+  }
+  return secret;
+};
+
+const getJwtExpiresIn = (): string => {
+  return process.env.JWT_EXPIRES_IN || '24h';
+};
 
 export interface JWTPayload {
   userId: string;
@@ -10,9 +21,12 @@ export interface JWTPayload {
 }
 
 export function generateToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const secret = getJwtSecret();
+  const expiresIn = getJwtExpiresIn();
+  return jwt.sign(payload, secret as jwt.Secret, { expiresIn } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JWTPayload {
-  return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  const secret = getJwtSecret();
+  return jwt.verify(token, secret) as JWTPayload;
 }
