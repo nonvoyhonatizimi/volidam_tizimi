@@ -1,10 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyPassword } from '@/lib/auth';
+import { verifyPassword, hashPassword } from '@/lib/auth';
 import { generateToken } from '@/lib/jwt';
+
+// Auto-create admin if no users exist
+async function ensureAdminExists() {
+  try {
+    const userCount = await prisma.user.count();
+    if (userCount === 0) {
+      const adminPassword = await hashPassword('admin123');
+      await prisma.user.create({
+        data: {
+          username: 'admin',
+          password: adminPassword,
+          fullName: 'Administrator',
+          role: 'ADMIN',
+          isActive: true,
+        },
+      });
+      console.log('Default admin user created: admin / admin123');
+    }
+  } catch (e) {
+    console.error('Failed to create admin:', e);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureAdminExists();
+
     const body = await request.json();
     const { username, password } = body;
 
