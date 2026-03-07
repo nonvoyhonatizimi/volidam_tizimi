@@ -36,24 +36,26 @@ export default function LoginPage() {
 
       console.log('Redirecting to role:', data.user.role);
 
-      // Redirect based on role
+      // Force redirect with full page reload
       const role = data.user.role;
+      let redirectUrl = '/admin';
       switch (role) {
         case 'ADMIN':
-          window.location.href = '/admin';
+          redirectUrl = '/admin';
           break;
         case 'HAMIRCHI':
-          window.location.href = '/hamirchi';
+          redirectUrl = '/hamirchi';
           break;
         case 'SOTUVCHI':
-          window.location.href = '/sotuvchi';
+          redirectUrl = '/sotuvchi';
           break;
         case 'DOKONCHI':
-          window.location.href = '/dokonchi';
+          redirectUrl = '/dokonchi';
           break;
-        default:
-          window.location.href = '/admin';
       }
+      
+      console.log('Redirecting to:', redirectUrl);
+      window.location.replace(redirectUrl);
     } catch (err: any) {
       setError(err.message);
     } finally {
