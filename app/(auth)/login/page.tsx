@@ -55,7 +55,10 @@ export default function LoginPage() {
       }
       
       console.log('Redirecting to:', redirectUrl);
-      window.location.replace(redirectUrl);
+      // Use setTimeout to ensure cookie is set before redirect
+      setTimeout(() => {
+        window.location.assign(redirectUrl);
+      }, 100);
     } catch (err: any) {
       setError(err.message);
     } finally {
