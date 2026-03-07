@@ -1,25 +1,52 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from functools import wraps
 import hashlib
 import os
-import psycopg2
-import psycopg2.extras
+import pg8000.native
+import urllib.parse
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'volidam-patir-secret-key-2024')
-
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
-def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+# ========== DB helpers ==========
+def get_conn():
+    url = urllib.parse.urlparse(DATABASE_URL)
+    return pg8000.native.Connection(
+        host=url.hostname,
+        port=url.port or 5432,
+        database=url.path[1:],
+        user=url.username,
+        password=url.password,
+        ssl_context=True
+    )
 
+def db_query(sql, params=None):
+    conn = get_conn()
+    try:
+        result = conn.run(sql, *(params or []))
+        cols = [c['name'] for c in conn.columns]
+        return [dict(zip(cols, row)) for row in result]
+    finally:
+        conn.close()
+
+def db_exec(sql, params=None):
+    conn = get_conn()
+    try:
+        conn.run(sql, *(params or []))
+    finally:
+        conn.close()
+
+def db_one(sql, params=None):
+    rows = db_query(sql, params)
+    return rows[0] if rows else None
+
+# ========== Init DB ==========
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
+    conn = get_conn()
+    try:
+        conn.run('''CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
             password VARCHAR(255) NOT NULL,
@@ -27,10 +54,8 @@ def init_db():
             role VARCHAR(20) NOT NULL,
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT NOW()
-        )
-    ''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS dough_entries (
+        )''')
+        conn.run('''CREATE TABLE IF NOT EXISTS dough_entries (
             id SERIAL PRIMARY KEY,
             flour_used FLOAT NOT NULL,
             water_used FLOAT NOT NULL,
@@ -41,10 +66,8 @@ def init_db():
             shift VARCHAR(10) DEFAULT 'DAY',
             created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT NOW()
-        )
-    ''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS sales (
+        )''')
+        conn.run('''CREATE TABLE IF NOT EXISTS sales (
             id SERIAL PRIMARY KEY,
             item_type VARCHAR(20) NOT NULL,
             quantity FLOAT NOT NULL,
@@ -55,10 +78,8 @@ def init_db():
             shift VARCHAR(10) DEFAULT 'DAY',
             created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT NOW()
-        )
-    ''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS expenses (
+        )''')
+        conn.run('''CREATE TABLE IF NOT EXISTS expenses (
             id SERIAL PRIMARY KEY,
             expense_type VARCHAR(50) NOT NULL,
             amount FLOAT NOT NULL,
@@ -66,23 +87,22 @@ def init_db():
             shift VARCHAR(10) DEFAULT 'DAY',
             created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT NOW()
-        )
-    ''')
-    # Create default admin if not exists
-    cur.execute("SELECT id FROM users WHERE username = 'admin'")
-    if not cur.fetchone():
-        admin_pass = hashlib.sha256('admin123'.encode()).hexdigest()
-        cur.execute(
-            "INSERT INTO users (username, password, full_name, role) VALUES (%s, %s, %s, %s)",
-            ('admin', admin_pass, 'Administrator', 'ADMIN')
-        )
-    conn.commit()
-    cur.close()
-    conn.close()
+        )''')
+        # Default admin
+        result = conn.run("SELECT id FROM users WHERE username = 'admin'")
+        if not result:
+            admin_pass = hashlib.sha256('admin123'.encode()).hexdigest()
+            conn.run(
+                "INSERT INTO users (username, password, full_name, role) VALUES (:u, :p, :f, :r)",
+                u='admin', p=admin_pass, f='Administrator', r='ADMIN'
+            )
+    finally:
+        conn.close()
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+def hash_password(p):
+    return hashlib.sha256(p.encode()).hexdigest()
 
+# ========== Auth decorators ==========
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -104,20 +124,15 @@ def role_required(roles):
         return decorated
     return decorator
 
+# ========== Routes ==========
 @app.route('/')
 def index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     role = session.get('role', '')
-    if role == 'ADMIN':
-        return redirect(url_for('admin_dashboard'))
-    elif role == 'HAMIRCHI':
-        return redirect(url_for('hamirchi_dashboard'))
-    elif role == 'SOTUVCHI':
-        return redirect(url_for('sotuvchi_dashboard'))
-    elif role == 'DOKONCHI':
-        return redirect(url_for('dokonchi_dashboard'))
-    return redirect(url_for('login'))
+    routes = {'ADMIN': 'admin_dashboard', 'HAMIRCHI': 'hamirchi_dashboard',
+              'SOTUVCHI': 'sotuvchi_dashboard', 'DOKONCHI': 'dokonchi_dashboard'}
+    return redirect(url_for(routes.get(role, 'login')))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -127,19 +142,12 @@ def login():
         if not username or not password:
             flash("Login va parol kiritilishi shart!", 'error')
             return render_template('login.html')
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute("SELECT * FROM users WHERE username = %s AND is_active = TRUE", (username,))
-        user = cur.fetchone()
-        cur.close()
-        conn.close()
+        user = db_one("SELECT * FROM users WHERE username = :u AND is_active = TRUE", [username])
         if not user or user['password'] != hash_password(password):
             flash("Noto'g'ri login yoki parol!", 'error')
             return render_template('login.html')
-        session['user_id'] = user['id']
-        session['username'] = user['username']
-        session['full_name'] = user['full_name']
-        session['role'] = user['role']
+        session.update({'user_id': user['id'], 'username': user['username'],
+                        'full_name': user['full_name'], 'role': user['role']})
         return redirect(url_for('index'))
     return render_template('login.html')
 
@@ -153,25 +161,13 @@ def logout():
 @login_required
 @role_required(['ADMIN'])
 def admin_dashboard():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM users ORDER BY created_at DESC")
-    users = cur.fetchall()
-    cur.execute("SELECT COUNT(*) as c FROM dough_entries WHERE DATE(created_at) = CURRENT_DATE")
-    dough_count = cur.fetchone()['c']
-    cur.execute("SELECT COUNT(*) as c, COALESCE(SUM(total),0) as total FROM sales WHERE DATE(created_at) = CURRENT_DATE")
-    sales_data = cur.fetchone()
-    cur.execute("SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE DATE(created_at) = CURRENT_DATE")
-    expenses_total = cur.fetchone()['total']
-    cur.close()
-    conn.close()
-    return render_template('admin.html',
-        users=users,
-        dough_count=dough_count,
-        sales_count=sales_data['c'],
-        sales_total=sales_data['total'],
-        expenses_total=expenses_total
-    )
+    users = db_query("SELECT * FROM users ORDER BY created_at DESC")
+    dough_count = (db_one("SELECT COUNT(*) as c FROM dough_entries WHERE DATE(created_at) = CURRENT_DATE") or {}).get('c', 0)
+    s = db_one("SELECT COUNT(*) as c, COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE") or {}
+    expenses_total = (db_one("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE DATE(created_at) = CURRENT_DATE") or {}).get('t', 0)
+    return render_template('admin.html', users=users, dough_count=dough_count,
+                           sales_count=s.get('c', 0), sales_total=s.get('t', 0),
+                           expenses_total=expenses_total)
 
 @app.route('/admin/users/add', methods=['POST'])
 @login_required
@@ -184,21 +180,12 @@ def add_user():
     if not all([username, password, full_name, role]):
         flash("Barcha maydonlarni to'ldiring!", 'error')
         return redirect(url_for('admin_dashboard'))
-    conn = get_db()
-    cur = conn.cursor()
     try:
-        cur.execute(
-            "INSERT INTO users (username, password, full_name, role) VALUES (%s, %s, %s, %s)",
-            (username, hash_password(password), full_name, role)
-        )
-        conn.commit()
-        flash(f"{full_name} muvaffaqiyatli qo'shildi!", 'success')
-    except psycopg2.IntegrityError:
-        conn.rollback()
+        db_exec("INSERT INTO users (username, password, full_name, role) VALUES (:u, :p, :f, :r)",
+                [username, hash_password(password), full_name, role])
+        flash(f"{full_name} qo'shildi!", 'success')
+    except Exception:
         flash("Bu username allaqachon mavjud!", 'error')
-    finally:
-        cur.close()
-        conn.close()
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
@@ -208,12 +195,7 @@ def delete_user(user_id):
     if user_id == session['user_id']:
         flash("O'zingizni o'chira olmaysiz!", 'error')
         return redirect(url_for('admin_dashboard'))
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE users SET is_active = FALSE WHERE id = %s", (user_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
+    db_exec("UPDATE users SET is_active = FALSE WHERE id = :id", [user_id])
     flash("Foydalanuvchi o'chirildi!", 'success')
     return redirect(url_for('admin_dashboard'))
 
@@ -221,84 +203,38 @@ def delete_user(user_id):
 @login_required
 @role_required(['ADMIN'])
 def admin_report():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""
-        SELECT d.*, u.full_name FROM dough_entries d
-        LEFT JOIN users u ON d.created_by = u.id
-        ORDER BY d.created_at DESC LIMIT 50
-    """)
-    dough_entries = cur.fetchall()
-    cur.execute("""
-        SELECT s.*, u.full_name FROM sales s
-        LEFT JOIN users u ON s.created_by = u.id
-        ORDER BY s.created_at DESC LIMIT 50
-    """)
-    sales = cur.fetchall()
-    cur.execute("""
-        SELECT e.*, u.full_name FROM expenses e
-        LEFT JOIN users u ON e.created_by = u.id
-        ORDER BY e.created_at DESC LIMIT 50
-    """)
-    expenses = cur.fetchall()
-    cur.execute("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE")
-    daily_sales = cur.fetchone()['t']
-    cur.execute("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE DATE(created_at) = CURRENT_DATE")
-    daily_expenses = cur.fetchone()['t']
-    cur.close()
-    conn.close()
-    return render_template('report.html',
-        dough_entries=dough_entries,
-        sales=sales,
-        expenses=expenses,
-        daily_sales=daily_sales,
-        daily_expenses=daily_expenses,
-        profit=daily_sales - daily_expenses
-    )
+    dough_entries = db_query("SELECT d.*, u.full_name FROM dough_entries d LEFT JOIN users u ON d.created_by = u.id ORDER BY d.created_at DESC LIMIT 50")
+    sales = db_query("SELECT s.*, u.full_name FROM sales s LEFT JOIN users u ON s.created_by = u.id ORDER BY s.created_at DESC LIMIT 50")
+    expenses = db_query("SELECT e.*, u.full_name FROM expenses e LEFT JOIN users u ON e.created_by = u.id ORDER BY e.created_at DESC LIMIT 50")
+    daily_sales = (db_one("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE") or {}).get('t', 0)
+    daily_expenses = (db_one("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE DATE(created_at) = CURRENT_DATE") or {}).get('t', 0)
+    return render_template('report.html', dough_entries=dough_entries, sales=sales,
+                           expenses=expenses, daily_sales=daily_sales,
+                           daily_expenses=daily_expenses, profit=daily_sales - daily_expenses)
 
 # ========== HAMIRCHI ==========
 @app.route('/hamirchi')
 @login_required
 @role_required(['ADMIN', 'HAMIRCHI'])
 def hamirchi_dashboard():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""
-        SELECT d.*, u.full_name FROM dough_entries d
-        LEFT JOIN users u ON d.created_by = u.id
-        ORDER BY d.created_at DESC LIMIT 20
-    """)
-    entries = cur.fetchall()
-    cur.execute("SELECT COALESCE(SUM(dough_produced),0) as t FROM dough_entries WHERE DATE(created_at) = CURRENT_DATE")
-    today_total = cur.fetchone()['t']
-    cur.close()
-    conn.close()
+    entries = db_query("SELECT d.*, u.full_name FROM dough_entries d LEFT JOIN users u ON d.created_by = u.id ORDER BY d.created_at DESC LIMIT 20")
+    today_total = (db_one("SELECT COALESCE(SUM(dough_produced),0) as t FROM dough_entries WHERE DATE(created_at) = CURRENT_DATE") or {}).get('t', 0)
     return render_template('hamirchi.html', entries=entries, today_total=today_total)
 
 @app.route('/hamirchi/add', methods=['POST'])
 @login_required
 @role_required(['ADMIN', 'HAMIRCHI'])
 def add_dough():
-    flour = request.form.get('flour_used')
-    water = request.form.get('water_used')
-    yeast = request.form.get('yeast_used')
-    salt = request.form.get('salt_used')
-    dough = request.form.get('dough_produced')
-    notes = request.form.get('notes', '')
-    shift = request.form.get('shift', 'DAY')
-    if not all([flour, water, yeast, salt, dough]):
-        flash("Barcha maydonlarni to'ldiring!", 'error')
-        return redirect(url_for('hamirchi_dashboard'))
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO dough_entries (flour_used, water_used, yeast_used, salt_used, dough_produced, notes, shift, created_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (flour, water, yeast, salt, dough, notes, shift, session['user_id']))
-    conn.commit()
-    cur.close()
-    conn.close()
-    flash("Xamir yozuvi saqlandi!", 'success')
+    try:
+        db_exec("""INSERT INTO dough_entries (flour_used, water_used, yeast_used, salt_used, dough_produced, notes, shift, created_by)
+                   VALUES (:a, :b, :c, :d, :e, :f, :g, :h)""",
+                [float(request.form['flour_used']), float(request.form['water_used']),
+                 float(request.form['yeast_used']), float(request.form['salt_used']),
+                 float(request.form['dough_produced']), request.form.get('notes', ''),
+                 request.form.get('shift', 'DAY'), session['user_id']])
+        flash("Xamir yozuvi saqlandi!", 'success')
+    except Exception as e:
+        flash(f"Xato: {e}", 'error')
     return redirect(url_for('hamirchi_dashboard'))
 
 # ========== SOTUVCHI ==========
@@ -306,50 +242,28 @@ def add_dough():
 @login_required
 @role_required(['ADMIN', 'SOTUVCHI'])
 def sotuvchi_dashboard():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""
-        SELECT s.*, u.full_name FROM sales s
-        LEFT JOIN users u ON s.created_by = u.id
-        ORDER BY s.created_at DESC LIMIT 20
-    """)
-    sales = cur.fetchall()
-    cur.execute("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE")
-    today_total = cur.fetchone()['t']
-    cur.execute("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE AND payment_type='CASH'")
-    cash_total = cur.fetchone()['t']
-    cur.execute("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE AND payment_type='CARD'")
-    card_total = cur.fetchone()['t']
-    cur.close()
-    conn.close()
-    return render_template('sotuvchi.html',
-        sales=sales,
-        today_total=today_total,
-        cash_total=cash_total,
-        card_total=card_total
-    )
+    sales = db_query("SELECT s.*, u.full_name FROM sales s LEFT JOIN users u ON s.created_by = u.id ORDER BY s.created_at DESC LIMIT 20")
+    today_total = (db_one("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE") or {}).get('t', 0)
+    cash_total = (db_one("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE AND payment_type='CASH'") or {}).get('t', 0)
+    card_total = (db_one("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) = CURRENT_DATE AND payment_type='CARD'") or {}).get('t', 0)
+    return render_template('sotuvchi.html', sales=sales, today_total=today_total,
+                           cash_total=cash_total, card_total=card_total)
 
 @app.route('/sotuvchi/add', methods=['POST'])
 @login_required
 @role_required(['ADMIN', 'SOTUVCHI'])
 def add_sale():
-    item_type = request.form.get('item_type')
-    quantity = float(request.form.get('quantity', 0))
-    price = float(request.form.get('price', 0))
-    payment_type = request.form.get('payment_type')
-    notes = request.form.get('notes', '')
-    shift = request.form.get('shift', 'DAY')
-    total = quantity * price
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO sales (item_type, quantity, price, total, payment_type, notes, shift, created_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (item_type, quantity, price, total, payment_type, notes, shift, session['user_id']))
-    conn.commit()
-    cur.close()
-    conn.close()
-    flash("Sotuv saqlandi!", 'success')
+    try:
+        qty = float(request.form['quantity'])
+        price = float(request.form['price'])
+        db_exec("""INSERT INTO sales (item_type, quantity, price, total, payment_type, notes, shift, created_by)
+                   VALUES (:a, :b, :c, :d, :e, :f, :g, :h)""",
+                [request.form['item_type'], qty, price, qty * price,
+                 request.form['payment_type'], request.form.get('notes', ''),
+                 request.form.get('shift', 'DAY'), session['user_id']])
+        flash("Sotuv saqlandi!", 'success')
+    except Exception as e:
+        flash(f"Xato: {e}", 'error')
     return redirect(url_for('sotuvchi_dashboard'))
 
 # ========== DOKONCHI ==========
@@ -357,41 +271,23 @@ def add_sale():
 @login_required
 @role_required(['ADMIN', 'DOKONCHI'])
 def dokonchi_dashboard():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""
-        SELECT e.*, u.full_name FROM expenses e
-        LEFT JOIN users u ON e.created_by = u.id
-        ORDER BY e.created_at DESC LIMIT 20
-    """)
-    expenses = cur.fetchall()
-    cur.execute("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE DATE(created_at) = CURRENT_DATE")
-    today_total = cur.fetchone()['t']
-    cur.close()
-    conn.close()
+    expenses = db_query("SELECT e.*, u.full_name FROM expenses e LEFT JOIN users u ON e.created_by = u.id ORDER BY e.created_at DESC LIMIT 20")
+    today_total = (db_one("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE DATE(created_at) = CURRENT_DATE") or {}).get('t', 0)
     return render_template('dokonchi.html', expenses=expenses, today_total=today_total)
 
 @app.route('/dokonchi/add', methods=['POST'])
 @login_required
 @role_required(['ADMIN', 'DOKONCHI'])
 def add_expense():
-    expense_type = request.form.get('expense_type')
-    amount = request.form.get('amount')
-    description = request.form.get('description', '')
-    shift = request.form.get('shift', 'DAY')
-    if not all([expense_type, amount]):
-        flash("Barcha maydonlarni to'ldiring!", 'error')
-        return redirect(url_for('dokonchi_dashboard'))
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO expenses (expense_type, amount, description, shift, created_by)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (expense_type, amount, description, shift, session['user_id']))
-    conn.commit()
-    cur.close()
-    conn.close()
-    flash("Xarajat saqlandi!", 'success')
+    try:
+        db_exec("""INSERT INTO expenses (expense_type, amount, description, shift, created_by)
+                   VALUES (:a, :b, :c, :d, :e)""",
+                [request.form['expense_type'], float(request.form['amount']),
+                 request.form.get('description', ''), request.form.get('shift', 'DAY'),
+                 session['user_id']])
+        flash("Xarajat saqlandi!", 'success')
+    except Exception as e:
+        flash(f"Xato: {e}", 'error')
     return redirect(url_for('dokonchi_dashboard'))
 
 if __name__ == '__main__':
