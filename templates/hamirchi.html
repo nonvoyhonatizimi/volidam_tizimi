@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hamirchi Dashboard - Volidam Patir</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            padding: 20px 0;
+        }
+        .logo {
+            text-align: center;
+            padding: 0 20px 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .logo h2 { color: #f59e0b; font-size: 24px; }
+        .logo p { color: rgba(255,255,255,0.6); font-size: 12px; }
+        .nav-menu { padding: 20px 0; }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 25px;
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .nav-item:hover, .nav-item.active {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border-left: 3px solid #f59e0b;
+        }
+        .nav-item span { margin-right: 12px; font-size: 20px; }
+        .main-content {
+            margin-left: 260px;
+            padding: 30px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .header h1 { color: #1a1a2e; font-size: 28px; }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .user-info span { color: #666; }
+        .btn-logout {
+            padding: 10px 20px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .card h2 {
+            color: #1a1a2e;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 14px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .btn-primary {
+            padding: 12px 30px;
+            background: #f59e0b;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            color: #666;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">
+            <h2>Volidam Patir</h2>
+            <p>Hamirchi Dashboard</p>
+        </div>
+        <nav class="nav-menu">
+            <a href="#" class="nav-item active"><span>&#127968;</span> Bosh sahifa</a>
+            <a href="#" class="nav-item"><span>&#127838;</span> Xamir ishlab chiqarish</a>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Xamir ishlab chiqarish</h1>
+            <div class="user-info">
+                <span>{{ user.fullName }} ({{ user.role }})</span>
+                <a href="{{ url_for('logout') }}" class="btn-logout">Chiqish</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Yangi xamir ishlab chiqarish</h2>
+            <form id="doughForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Un (kg)</label>
+                        <input type="number" name="flourUsed" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Suv (l)</label>
+                        <input type="number" name="waterUsed" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Xamirturush (g)</label>
+                        <input type="number" name="yeastUsed" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tuz (g)</label>
+                        <input type="number" name="saltUsed" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Ishlab chiqarilgan xamir (kg)</label>
+                        <input type="number" name="doughProduced" step="0.1" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">Saqlash</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>So'nggi yozuvlar</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sana</th>
+                        <th>Un</th>
+                        <th>Suv</th>
+                        <th>Xamirturush</th>
+                        <th>Tuz</th>
+                        <th>Ishlab chiqarilgan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in dough_entries %}
+                    <tr>
+                        <td>{{ entry.date[:10] }}</td>
+                        <td>{{ entry.flourUsed }} kg</td>
+                        <td>{{ entry.waterUsed }} l</td>
+                        <td>{{ entry.yeastUsed }} g</td>
+                        <td>{{ entry.saltUsed }} g</td>
+                        <td>{{ entry.doughProduced }} kg</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
