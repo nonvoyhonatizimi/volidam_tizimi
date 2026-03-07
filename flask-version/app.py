@@ -25,7 +25,10 @@ def get_conn():
 def db_query(sql, params=None):
     conn = get_conn()
     try:
-        result = conn.run(sql, *(params or []))
+        if params:
+            result = conn.run(sql, *params)
+        else:
+            result = conn.run(sql)
         cols = [c['name'] for c in conn.columns]
         return [dict(zip(cols, row)) for row in result]
     finally:
@@ -34,7 +37,10 @@ def db_query(sql, params=None):
 def db_exec(sql, params=None):
     conn = get_conn()
     try:
-        conn.run(sql, *(params or []))
+        if params:
+            conn.run(sql, *params)
+        else:
+            conn.run(sql)
     finally:
         conn.close()
 
@@ -88,14 +94,11 @@ def init_db():
             created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT NOW()
         )''')
-        # Default admin
-        result = conn.run("SELECT id FROM users WHERE username = 'admin'")
+        result = conn.run("SELECT id FROM users WHERE username = $1", ['admin'])
         if not result:
             admin_pass = hashlib.sha256('admin123'.encode()).hexdigest()
-            conn.run(
-                "INSERT INTO users (username, password, full_name, role) VALUES (:u, :p, :f, :r)",
-                u='admin', p=admin_pass, f='Administrator', r='ADMIN'
-            )
+            conn.run("INSERT INTO users (username, password, full_name, role) VALUES ($1, $2, $3, $4)",
+                     'admin', admin_pass, 'Administrator', 'ADMIN')
     finally:
         conn.close()
 
@@ -142,7 +145,7 @@ def login():
         if not username or not password:
             flash("Login va parol kiritilishi shart!", 'error')
             return render_template('login.html')
-        user = db_one("SELECT * FROM users WHERE username = :u AND is_active = TRUE", [username])
+        user = db_one("SELECT * FROM users WHERE username = $1 AND is_active = TRUE", [username])
         if not user or user['password'] != hash_password(password):
             flash("Noto'g'ri login yoki parol!", 'error')
             return render_template('login.html')
@@ -181,7 +184,7 @@ def add_user():
         flash("Barcha maydonlarni to'ldiring!", 'error')
         return redirect(url_for('admin_dashboard'))
     try:
-        db_exec("INSERT INTO users (username, password, full_name, role) VALUES (:u, :p, :f, :r)",
+        db_exec("INSERT INTO users (username, password, full_name, role) VALUES ($1, $2, $3, $4)",
                 [username, hash_password(password), full_name, role])
         flash(f"{full_name} qo'shildi!", 'success')
     except Exception:
@@ -195,7 +198,7 @@ def delete_user(user_id):
     if user_id == session['user_id']:
         flash("O'zingizni o'chira olmaysiz!", 'error')
         return redirect(url_for('admin_dashboard'))
-    db_exec("UPDATE users SET is_active = FALSE WHERE id = :id", [user_id])
+    db_exec("UPDATE users SET is_active = FALSE WHERE id = $1", [user_id])
     flash("Foydalanuvchi o'chirildi!", 'success')
     return redirect(url_for('admin_dashboard'))
 
@@ -227,7 +230,7 @@ def hamirchi_dashboard():
 def add_dough():
     try:
         db_exec("""INSERT INTO dough_entries (flour_used, water_used, yeast_used, salt_used, dough_produced, notes, shift, created_by)
-                   VALUES (:a, :b, :c, :d, :e, :f, :g, :h)""",
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                 [float(request.form['flour_used']), float(request.form['water_used']),
                  float(request.form['yeast_used']), float(request.form['salt_used']),
                  float(request.form['dough_produced']), request.form.get('notes', ''),
@@ -257,7 +260,7 @@ def add_sale():
         qty = float(request.form['quantity'])
         price = float(request.form['price'])
         db_exec("""INSERT INTO sales (item_type, quantity, price, total, payment_type, notes, shift, created_by)
-                   VALUES (:a, :b, :c, :d, :e, :f, :g, :h)""",
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                 [request.form['item_type'], qty, price, qty * price,
                  request.form['payment_type'], request.form.get('notes', ''),
                  request.form.get('shift', 'DAY'), session['user_id']])
@@ -281,7 +284,7 @@ def dokonchi_dashboard():
 def add_expense():
     try:
         db_exec("""INSERT INTO expenses (expense_type, amount, description, shift, created_by)
-                   VALUES (:a, :b, :c, :d, :e)""",
+                   VALUES ($1, $2, $3, $4, $5)""",
                 [request.form['expense_type'], float(request.form['amount']),
                  request.form.get('description', ''), request.form.get('shift', 'DAY'),
                  session['user_id']])
