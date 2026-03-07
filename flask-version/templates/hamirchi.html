@@ -3,182 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hamirchi Dashboard - Volidam Patir</title>
+    <title>Hamirchi - Volidam Patir</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
-            min-height: 100vh;
-        }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; }
         .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 260px;
-            height: 100vh;
-            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
-            padding: 20px 0;
+            position: fixed; left: 0; top: 0;
+            width: 250px; height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e, #16213e);
+            padding: 0; z-index: 100;
         }
-        .logo {
-            text-align: center;
-            padding: 0 20px 30px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+        .sidebar-logo { padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; }
+        .sidebar-logo h2 { color: #f59e0b; font-size: 22px; }
+        .sidebar-logo p { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 4px; }
+        .nav-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px 20px; color: rgba(255,255,255,0.7);
+            text-decoration: none; transition: all 0.2s;
+            border-left: 3px solid transparent;
         }
-        .logo h2 { color: #f59e0b; font-size: 24px; }
-        .logo p { color: rgba(255,255,255,0.6); font-size: 12px; }
-        .nav-menu { padding: 20px 0; }
-        .nav-item {
-            display: flex;
-            align-items: center;
-            padding: 15px 25px;
-            color: rgba(255,255,255,0.8);
-            text-decoration: none;
-            transition: all 0.3s;
+        .nav-link:hover, .nav-link.active { background: rgba(245,158,11,0.15); color: #f59e0b; border-left-color: #f59e0b; }
+        .icon { font-size: 18px; width: 24px; }
+        .main { margin-left: 250px; min-height: 100vh; }
+        .topbar {
+            background: white; padding: 15px 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
         }
-        .nav-item:hover, .nav-item.active {
-            background: rgba(245, 158, 11, 0.2);
-            color: #f59e0b;
-            border-left: 3px solid #f59e0b;
+        .topbar h1 { font-size: 22px; color: #1a1a2e; }
+        .user-badge { display: flex; align-items: center; gap: 12px; }
+        .user-badge span { color: #666; font-size: 14px; }
+        .btn-logout { padding: 8px 18px; background: #ef4444; color: white; border: none; border-radius: 8px; text-decoration: none; font-size: 14px; }
+        .content { padding: 25px 30px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
+        .stat-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+        .stat-card .label { color: #888; font-size: 13px; margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: 700; color: #2563eb; }
+        .stat-card .sub { font-size: 12px; color: #888; margin-top: 4px; }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .card h2 { font-size: 18px; color: #1a1a2e; margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .form-group { margin-bottom: 0; }
+        .form-group label { display: block; margin-bottom: 6px; color: #555; font-size: 13px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 14px;
+            border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px;
         }
-        .nav-item span { margin-right: 12px; font-size: 20px; }
-        .main-content {
-            margin-left: 260px;
-            padding: 30px;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-        .header h1 { color: #1a1a2e; font-size: 28px; }
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .user-info span { color: #666; }
-        .btn-logout {
-            padding: 10px 20px;
-            background: #ef4444;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        }
-        .card h2 {
-            color: #1a1a2e;
-            margin-bottom: 20px;
-            font-size: 20px;
-        }
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #666;
-            font-size: 14px;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .btn-primary {
-            padding: 12px 30px;
-            background: #f59e0b;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        th {
-            color: #666;
-            font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #f59e0b; }
+        .form-group textarea { resize: vertical; min-height: 70px; }
+        .btn-row { display: flex; justify-content: flex-end; margin-top: 20px; }
+        .btn-primary { padding: 12px 30px; background: #f59e0b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 500; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+        th { color: #888; font-weight: 600; font-size: 12px; text-transform: uppercase; background: #fafafa; }
+        .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .badge-day { background: #fef3c7; color: #d97706; }
+        .badge-night { background: #e0e7ff; color: #4338ca; }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <div class="logo">
-            <h2>Volidam Patir</h2>
-            <p>Hamirchi Dashboard</p>
-        </div>
-        <nav class="nav-menu">
-            <a href="#" class="nav-item active"><span>&#127968;</span> Bosh sahifa</a>
-            <a href="#" class="nav-item"><span>&#127838;</span> Xamir ishlab chiqarish</a>
-        </nav>
+<div class="sidebar">
+    <div class="sidebar-logo">
+        <h2>Volidam Patir</h2>
+        <p>Hamirchi Panel</p>
     </div>
+    <a href="/hamirchi" class="nav-link active"><span class="icon">🏠</span> Bosh sahifa</a>
+    <a href="/logout" class="nav-link"><span class="icon">🚪</span> Chiqish</a>
+</div>
+<div class="main">
+    <div class="topbar">
+        <h1>Xamir Ishlab Chiqarish</h1>
+        <div class="user-badge">
+            <span>{{ session.full_name }} (HAMIRCHI)</span>
+            <a href="/logout" class="btn-logout">Chiqish</a>
+        </div>
+    </div>
+    <div class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}{% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+        {% endfor %}{% endif %}{% endwith %}
 
-    <div class="main-content">
-        <div class="header">
-            <h1>Xamir ishlab chiqarish</h1>
-            <div class="user-info">
-                <span>{{ user.fullName }} ({{ user.role }})</span>
-                <a href="{{ url_for('logout') }}" class="btn-logout">Chiqish</a>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Bugun ishlab chiqarilgan</div>
+                <div class="value">{{ today_total }} kg</div>
+                <div class="sub">Jami xamir</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Bugungi yozuvlar</div>
+                <div class="value">{{ entries|length }}</div>
+                <div class="sub">ta yozuv</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Bugungi sana</div>
+                <div class="value" style="font-size:18px">{{ now().strftime('%d.%m.%Y') if now else '' }}</div>
+                <div class="sub">Kun hisoboti</div>
             </div>
         </div>
 
         <div class="card">
-            <h2>Yangi xamir ishlab chiqarish</h2>
-            <form id="doughForm">
+            <h2>Yangi Xamir Yozuvi</h2>
+            <form method="POST" action="/hamirchi/add">
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Un (kg)</label>
-                        <input type="number" name="flourUsed" step="0.1" required>
+                        <input type="number" name="flour_used" step="0.1" min="0" placeholder="0.0" required>
                     </div>
                     <div class="form-group">
-                        <label>Suv (l)</label>
-                        <input type="number" name="waterUsed" step="0.1" required>
+                        <label>Suv (litr)</label>
+                        <input type="number" name="water_used" step="0.1" min="0" placeholder="0.0" required>
                     </div>
                     <div class="form-group">
-                        <label>Xamirturush (g)</label>
-                        <input type="number" name="yeastUsed" step="0.1" required>
+                        <label>Xamirturush (gramm)</label>
+                        <input type="number" name="yeast_used" step="0.1" min="0" placeholder="0.0" required>
                     </div>
                     <div class="form-group">
-                        <label>Tuz (g)</label>
-                        <input type="number" name="saltUsed" step="0.1" required>
+                        <label>Tuz (gramm)</label>
+                        <input type="number" name="salt_used" step="0.1" min="0" placeholder="0.0" required>
                     </div>
                     <div class="form-group">
                         <label>Ishlab chiqarilgan xamir (kg)</label>
-                        <input type="number" name="doughProduced" step="0.1" required>
+                        <input type="number" name="dough_produced" step="0.1" min="0" placeholder="0.0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Smena</label>
+                        <select name="shift">
+                            <option value="DAY">Kunduzgi</option>
+                            <option value="NIGHT">Tungi</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 3;">
+                        <label>Izoh (ixtiyoriy)</label>
+                        <textarea name="notes" placeholder="Qo'shimcha izoh..."></textarea>
                     </div>
                 </div>
-                <button type="submit" class="btn-primary">Saqlash</button>
+                <div class="btn-row">
+                    <button type="submit" class="btn-primary">💾 Saqlash</button>
+                </div>
             </form>
         </div>
 
         <div class="card">
-            <h2>So'nggi yozuvlar</h2>
+            <h2>So'nggi Yozuvlar</h2>
             <table>
                 <thead>
                     <tr>
@@ -187,23 +157,30 @@
                         <th>Suv</th>
                         <th>Xamirturush</th>
                         <th>Tuz</th>
-                        <th>Ishlab chiqarilgan</th>
+                        <th>Ishlab chiqarildi</th>
+                        <th>Smena</th>
+                        <th>Kim</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for entry in dough_entries %}
+                    {% for e in entries %}
                     <tr>
-                        <td>{{ entry.date[:10] }}</td>
-                        <td>{{ entry.flourUsed }} kg</td>
-                        <td>{{ entry.waterUsed }} l</td>
-                        <td>{{ entry.yeastUsed }} g</td>
-                        <td>{{ entry.saltUsed }} g</td>
-                        <td>{{ entry.doughProduced }} kg</td>
+                        <td>{{ e.created_at.strftime('%d.%m.%Y %H:%M') if e.created_at else '-' }}</td>
+                        <td>{{ e.flour_used }} kg</td>
+                        <td>{{ e.water_used }} l</td>
+                        <td>{{ e.yeast_used }} g</td>
+                        <td>{{ e.salt_used }} g</td>
+                        <td><b>{{ e.dough_produced }} kg</b></td>
+                        <td><span class="badge badge-{{ e.shift.lower() if e.shift else 'day' }}">{{ 'Kunduz' if e.shift == 'DAY' else 'Tun' }}</span></td>
+                        <td>{{ e.full_name or '-' }}</td>
                     </tr>
+                    {% else %}
+                    <tr><td colspan="8" style="text-align:center; color:#aaa; padding:30px;">Hali yozuv yo'q</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+</div>
 </body>
 </html>
